@@ -9,6 +9,9 @@ class Borrow extends Model
 {
     use HasFactory;
 
+    public const STATUS_BORROWED = 'borrowed';
+    public const STATUS_RETURNED = 'returned';
+
     protected $fillable = [
         'user_id', 'book_id', 'borrowed_at', 'due_date', 'returned_at', 'status'
     ];

@@ -4,55 +4,72 @@ namespace App\Services;
 
 use App\Models\Book;
 use App\Models\Borrow;
-use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
+use App\Models\User;
 
 class BorrowService
 {
-    /**
-     * Create a new borrow record from the dashboard.
-     *
-     * @param array $validatedData
-     * @return \App\Models\Borrow
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    public function createBorrowFromDashboard(array $validatedData): Borrow
+    public function listUserBorrows(User $user)
     {
-        $book = Book::findOrFail($validatedData['book_id']);
-        $user = User::findOrFail($validatedData['user_id']);
+        return $user->borrows()->with('book')->latest()->paginate(15);
+    }
 
-        // 1. Check book availability
-        if ($book->available_quantity < 1) {
-            throw ValidationException::withMessages([
-               'book_id' => __('هذا الكتاب غير متاح للاستعارة حاليًا.')
-            ]);
-        }
+    public function showBorrow(Borrow $borrow)
+    {
+        $borrow->load('book', 'user');
+        return $borrow;
+    }
 
-        // 2. Check if user already borrowed this book and not returned it
-        $existingBorrow = $user->borrows()
-                                ->where('book_id', $book->id)
-                                ->where('status', 'borrowed')
-                                ->exists();
+    public function storeBorrow(User $user, array $data)
+    {
+        $book = Book::findOrFail($data['book_id']);
 
-        if ($existingBorrow) {
-            throw ValidationException::withMessages([
-               'book_id' => __('هذا المستخدم قد استعار هذا الكتاب بالفعل ولم يرجعه بعد.')
-            ]);
-        }
+        $this->validateBookForBorrowing($book, $user);
 
-        // 3. Create borrow record and decrement book quantity
-        return DB::transaction(function () use ($validatedData, $book) {
-            $borrow = Borrow::create([
-                'user_id' => $validatedData['user_id'],
-                'book_id' => $validatedData['book_id'],
+        return DB::transaction(function () use ($user, $book) {
+            $borrow = $user->borrows()->create([
+                'book_id' => $book->id,
                 'borrowed_at' => now(),
                 'status' => 'borrowed',
             ]);
 
             $book->decrement('available_quantity');
 
-            return $borrow;
+            return $borrow->load('book');
         });
+    }
+
+    public function updateBorrow(Borrow $borrow, array $data)
+    {
+        $borrow->update($data);
+        return $borrow->fresh('book');
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function validateBookForBorrowing(Book $book, User $user): void
+    {
+        if ($book->available_quantity < 1) {
+            throw ValidationException::withMessages([
+                'book_id' => __('هذا الكتاب غير متاح للاستعارة حاليًا.')
+            ]);
+        }
+
+        if ($this->userHasActiveBorrowForBook($user, $book)) {
+            throw ValidationException::withMessages([
+                'book_id' => __('لقد قمت باستعارة هذا الكتاب بالفعل ولم تقم بإرجاعه بعد.')
+            ]);
+        }
+    }
+
+    private function userHasActiveBorrowForBook(User $user, Book $book): bool
+    {
+        return $user->borrows()
+            ->where('book_id', $book->id)
+            ->where('status', 'borrowed')
+            ->exists();
     }
 } 

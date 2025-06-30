@@ -6,12 +6,20 @@ use App\Models\User;
 use App\Http\Requests\User\StoreRequest;
 use App\Http\Requests\User\UpdateRequest;
 use Illuminate\Support\Facades\Hash;
+use App\Services\Dashboard\UserService;
 
 class UsersController extends Controller
 {
+    protected $userService;
+
+    public function __construct(UserService $userService)
+    {
+        $this->userService = $userService;
+    }
+
     public function index()
     {
-        $users = User::latest()->paginate(10);
+        $users = $this->userService->listUsers();
         return view('users.index', compact('users'));
     }
 
@@ -22,15 +30,13 @@ class UsersController extends Controller
 
     public function store(StoreRequest $request)
     {
-        $data = $request->validated();
-        $data['password'] = Hash::make($data['password']);
-        User::create($data);
+        $this->userService->createUser($request->validated());
         return redirect()->route('dashboard.users.index')->with('success', __('dashboard.user_created'));
     }
 
     public function show(User $user)
     {
-        $user->load('profile');
+        $user = $this->userService->showUser($user);
         return view('users.show', compact('user'));
     }
 
@@ -41,24 +47,14 @@ class UsersController extends Controller
 
     public function update(UpdateRequest $request, User $user)
     {
-        $data = $request->validated();
-        if (!empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
-            unset($data['password']);
-        }
-
-        $user->update($data);
+        $this->userService->updateUser($user, $request->validated());
         return redirect()->route('dashboard.users.index')->with('success', __('dashboard.user_updated'));
     }
 
     public function destroy(User $user)
     {
-        // Prevent admin from deleting themselves
-        if ($user->id === auth()->id()) {
-            return back()->with('error', __('dashboard.cannot_delete_self'));
-        }
-        $user->delete();
+        $this->authorize('delete', $user);
+        $this->userService->deleteUser($user);
         return redirect()->route('dashboard.users.index')->with('success', __('dashboard.user_deleted'));
     }
 } 

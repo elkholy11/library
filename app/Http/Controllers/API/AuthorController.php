@@ -5,18 +5,26 @@ use App\Http\Controllers\Controller;
 use App\Models\Author;
 use Illuminate\Http\Request;
 use App\Http\Resources\AuthorResource;
+use App\Services\AuthorService;
 
 class AuthorController extends Controller
 {
+    protected $authorService;
+
+    public function __construct(AuthorService $authorService)
+    {
+        $this->authorService = $authorService;
+    }
+
     public function index(Request $request)
     {
-        $authors = Author::paginate(15);
+        $authors = $this->authorService->listAuthors();
         return AuthorResource::collection($authors);
     }
 
     public function show(Author $author)
     {
-        $author->load('books');
+        $author = $this->authorService->showAuthor($author);
         return new AuthorResource($author);
     }
 } 

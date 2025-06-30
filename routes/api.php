@@ -24,20 +24,28 @@ use App\Http\Controllers\API\AuthController;
 // API v1 routes
 Route::prefix('v1')->group(function () {
     // Auth routes
-    Route::prefix('auth')->group(function () {
-        Route::post('/login', [AuthController::class, 'login']);
-        Route::post('/register', [AuthController::class, 'register']);
-        Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+    Route::controller(AuthController::class)->prefix('auth')->group(function () {
+        Route::post('/login', 'login');
+        Route::post('/register', 'register');
+        Route::middleware('auth:sanctum')->post('/logout', 'logout');
     });
 
-    // Public Book, Category, Author
-    Route::get('books', [BookController::class, 'index']);
-    Route::get('books/search', [BookController::class, 'search']);
-    Route::get('books/{book}', [BookController::class, 'show']);
-    Route::get('categories', [CategoryController::class, 'index']);
-    Route::get('categories/{category}', [CategoryController::class, 'show']);
-    Route::get('authors', [AuthorController::class, 'index']);
-    Route::get('authors/{author}', [AuthorController::class, 'show']);
+    // Public Book, Category, Author routes
+    Route::controller(BookController::class)->prefix('books')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/search', 'search');
+        Route::get('/{book}', 'show');
+    });
+
+    Route::controller(CategoryController::class)->prefix('categories')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/{category}', 'show');
+    });
+
+    Route::controller(AuthorController::class)->prefix('authors')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/{author}', 'show');
+    });
 
     // Protected User Routes (auth:sanctum)
     Route::middleware('auth:sanctum')->group(function () {

@@ -7,67 +7,45 @@ use App\Models\Book;
 use Illuminate\Http\Request;
 use App\Http\Resources\BorrowResource;
 use App\Http\Requests\Borrow\StoreRequest;
+use App\Http\Requests\API\Borrow\UpdateRequest;
 use Illuminate\Validation\ValidationException;
+use App\Services\BorrowService;
 
 class BorrowController extends Controller
 {
+    protected $borrowService;
+
+    public function __construct(BorrowService $borrowService)
+    {
+        $this->borrowService = $borrowService;
+    }
+
     public function index(Request $request)
     {
-        $borrows = $request->user()->borrows()->with('book')->latest()->paginate(15);
+        $borrows = $this->borrowService->listUserBorrows($request->user());
         return BorrowResource::collection($borrows);
     }
 
     public function show(Borrow $borrow)
     {
         $this->authorize('view', $borrow);
-        $borrow->load('book', 'user');
+        $borrow = $this->borrowService->showBorrow($borrow);
         return new BorrowResource($borrow);
     }
 
     public function store(StoreRequest $request)
     {
-        $book = Book::findOrFail($request->validated('book_id'));
-
-        if ($book->available_quantity < 1) {
-            throw ValidationException::withMessages([
-               'book_id' => __('هذا الكتاب غير متاح للاستعارة حاليًا.')
-            ]);
-        }
-        
-        // Check if user already borrowed this book and not returned it
-        $existingBorrow = $request->user()->borrows()
-                                    ->where('book_id', $book->id)
-                                    ->where('status', 'borrowed')
-                                    ->exists();
-
-        if ($existingBorrow) {
-            throw ValidationException::withMessages([
-               'book_id' => __('لقد قمت باستعارة هذا الكتاب بالفعل ولم تقم بإرجاعه بعد.')
-            ]);
-        }
-
-        $borrow = $request->user()->borrows()->create([
-            'book_id' => $book->id,
-            'borrowed_at' => now(),
-            'status' => 'borrowed',
-        ]);
-
-        $book->decrement('available_quantity');
-
-        return new BorrowResource($borrow->load('book'));
+        $borrow = $this->borrowService->storeBorrow($request->user(), $request->validated());
+        return new BorrowResource($borrow);
     }
 
-    public function update(Request $request, Borrow $borrow)
+    public function update(UpdateRequest $request, Borrow $borrow)
     {
         $this->authorize('update', $borrow);
-        $validated = $request->validate([
-            'status' => 'required|in:borrowed,returned',
-            'returned_at' => 'nullable|date'
-        ]);
-        $borrow->update($validated);
+        $borrow = $this->borrowService->updateBorrow($borrow, $request->validated());
         return response()->json([
             'message' => 'Borrow updated successfully',
-            'borrow' => new BorrowResource($borrow->fresh('book'))
+            'borrow' => new BorrowResource($borrow)
         ]);
     }
 

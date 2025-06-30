@@ -6,40 +6,47 @@ use App\Models\BookRequest;
 use Illuminate\Http\Request;
 use App\Http\Resources\BookRequest\BookRequestResource;
 use App\Http\Requests\BookRequest\StoreBookRequestRequest;
+use App\Services\BookRequestService;
 
 class BookRequestController extends Controller
 {
+    protected $bookRequestService;
+
+    public function __construct(BookRequestService $bookRequestService)
+    {
+        $this->bookRequestService = $bookRequestService;
+    }
+
     public function index(Request $request)
     {
-        $bookRequests = BookRequest::where('user_id', $request->user()->id)->paginate(15);
+        $bookRequests = $this->bookRequestService->listUserBookRequests($request->user());
         return BookRequestResource::collection($bookRequests);
     }
 
     public function show(BookRequest $bookRequest)
     {
         $this->authorize('view', $bookRequest);
+        $bookRequest = $this->bookRequestService->showBookRequest($bookRequest);
         return new BookRequestResource($bookRequest);
     }
 
     public function store(StoreBookRequestRequest $request)
     {
-        $data = $request->validated();
-        $data['user_id'] = $request->user()->id;
-        $bookRequest = BookRequest::create($data);
+        $bookRequest = $this->bookRequestService->storeBookRequest($request->user(), $request->validated());
         return new BookRequestResource($bookRequest);
     }
 
     public function update(Request $request, BookRequest $bookRequest)
     {
         $this->authorize('update', $bookRequest);
-        $bookRequest->update($request->all());
+        $bookRequest = $this->bookRequestService->updateBookRequest($bookRequest, $request->all());
         return new BookRequestResource($bookRequest);
     }
 
     public function destroy(Request $request, BookRequest $bookRequest)
     {
         $this->authorize('delete', $bookRequest);
-        $bookRequest->delete();
+        $this->bookRequestService->deleteBookRequest($bookRequest);
         return response()->json(['message' => __('تم حذف طلب الكتاب بنجاح')]);
     }
 } 

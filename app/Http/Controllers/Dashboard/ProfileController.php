@@ -7,15 +7,23 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use App\Services\Dashboard\ProfileService;
 
 class ProfileController extends Controller
 {
+    protected $profileService;
+
+    public function __construct(ProfileService $profileService)
+    {
+        $this->profileService = $profileService;
+    }
+
     /**
      * Display the specified resource.
      */
     public function show()
     {
-        $user = Auth::user();
+        $user = $this->profileService->getProfile();
         return view('profile.show', compact('user'));
     }
 
@@ -24,7 +32,7 @@ class ProfileController extends Controller
      */
     public function edit()
     {
-        $user = Auth::user();
+        $user = $this->profileService->getProfile();
         return view('profile.edit', compact('user'));
     }
 
@@ -33,8 +41,7 @@ class ProfileController extends Controller
      */
     public function update(Request $request)
     {
-        $user = Auth::user();
-
+        $user = $this->profileService->getProfile();
         $validatedData = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
@@ -43,29 +50,7 @@ class ProfileController extends Controller
             'address' => ['nullable', 'string', 'max:255'],
             'bio' => ['nullable', 'string'],
         ]);
-        
-        $userData = [
-            'name' => $validatedData['name'],
-            'email' => $validatedData['email'],
-        ];
-
-        if (!empty($validatedData['password'])) {
-            $userData['password'] = Hash::make($validatedData['password']);
-        }
-        
-        $user->update($userData);
-
-        $user->profile()->updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'name' => $validatedData['name'],
-                'email' => $validatedData['email'],
-                'phone' => $validatedData['phone'],
-                'address' => $validatedData['address'],
-                'bio' => $validatedData['bio'],
-            ]
-        );
-
+        $this->profileService->updateProfile($user, $validatedData);
         return redirect()->route('dashboard.profile.show')->with('success', __('dashboard.profile_updated'));
     }
 } 

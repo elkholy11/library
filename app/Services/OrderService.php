@@ -2,47 +2,82 @@
 
 namespace App\Services;
 
-use App\Models\Book;
 use App\Models\Order;
+use App\Models\Book;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class OrderService
 {
-    /**
-     * Create a new order from the dashboard.
-     *
-     * @param array $validatedData
-     * @return \App\Models\Order
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    public function createOrderFromDashboard(array $validatedData): Order
+    public function listUserOrders(User $user)
     {
-        return DB::transaction(function () use ($validatedData) {
-            $order = Order::create([
-                'user_id' => $validatedData['user_id'],
-                'status' => 'pending'
-            ]);
+        return Order::where('user_id', $user->id)
+                    ->with('books')
+                    ->latest()
+                    ->paginate(15);
+    }
 
-            $booksToAttach = [];
+    public function showOrder(Order $order)
+    {
+        $order->load('user', 'books');
+        return $order;
+    }
 
-            foreach ($validatedData['books'] as $key => $bookData) {
-                $book = Book::findOrFail($bookData['book_id']);
-                $quantity = $bookData['quantity'];
+    public function storeOrder(User $user, array $validated)
+    {
+        $booksToOrder = $this->validateAndPrepareBooks($validated['books']);
 
-                if ($book->available_quantity < $quantity) {
-                    throw ValidationException::withMessages([
-                        "books.{$key}.quantity" => "الكمية المطلوبة للكتاب '{$book->title}' غير متوفرة. المتوفر: {$book->available_quantity}"
-                    ]);
-                }
-
-                $booksToAttach[$book->id] = ['quantity' => $quantity];
-                $book->decrement('available_quantity', $quantity);
-            }
-
-            $order->books()->attach($booksToAttach);
-
-            return $order;
+        return DB::transaction(function () use ($user, $booksToOrder) {
+            $order = $user->orders()->create(['status' => 'pending']);
+            $this->attachBooksToOrder($order, $booksToOrder);
+            return $order->load('books');
         });
+    }
+
+    public function updateOrderStatus(Order $order, string $status)
+    {
+        $order->update(['status' => $status]);
+        return $order->fresh('books');
+    }
+
+    public function deleteOrder(Order $order)
+    {
+        DB::transaction(function () use ($order) {
+            foreach ($order->books as $book) {
+                Book::find($book->id)->increment('available_quantity', $book->pivot->quantity);
+            }
+            $order->delete();
+        });
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function validateAndPrepareBooks(array $booksData): array
+    {
+        $booksToOrder = [];
+        foreach ($booksData as $bookData) {
+            $book = Book::findOrFail($bookData['book_id']);
+            $quantity = $bookData['quantity'];
+
+            if ($book->available_quantity < $quantity) {
+                throw ValidationException::withMessages([
+                    'books' => "الكتاب '{$book->title}' غير متوفر بالكمية المطلوبة. المتوفر: {$book->available_quantity}"
+                ]);
+            }
+            $booksToOrder[] = ['book' => $book, 'quantity' => $quantity];
+        }
+        return $booksToOrder;
+    }
+
+    private function attachBooksToOrder(Order $order, array $booksToOrder): void
+    {
+        $booksToAttach = [];
+        foreach ($booksToOrder as $data) {
+            $data['book']->decrement('available_quantity', $data['quantity']);
+            $booksToAttach[$data['book']->id] = ['quantity' => $data['quantity']];
+        }
+        $order->books()->attach($booksToAttach);
     }
 } 

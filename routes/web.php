@@ -41,17 +41,21 @@ Route::middleware(['auth', 'is_admin'])->prefix('dashboard')->name('dashboard.')
     Route::resource('borrows', BorrowsController::class);
     Route::resource('book_requests', BookRequestsController::class);
 
-    Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
-    Route::get('profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::controller(ProfileController::class)->prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', 'show')->name('show');
+        Route::get('/edit', 'edit')->name('edit');
+        Route::put('/', 'update')->name('update');
+    });
 });
 
 // مسارات تسجيل الدخول والتسجيل وتسجيل الخروج
-Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
-Route::post('login', [AuthController::class, 'login']);
-Route::get('register', [AuthController::class, 'showRegisterForm'])->name('register');
-Route::post('register', [AuthController::class, 'register']);
-Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+Route::controller(AuthController::class)->group(function () {
+    Route::get('login', 'showLoginForm')->name('login');
+    Route::post('login', 'login');
+    Route::get('register', 'showRegisterForm')->name('register');
+    Route::post('register', 'register');
+    Route::post('logout', 'logout')->name('logout');
+});
 
 // تبديل اللغة
 Route::get('lang/{locale}', [LocalizationController::class, 'setLang'])->name('lang.switch');

@@ -31,7 +31,7 @@
                     <div class="row book-row mb-3 align-items-end">
                         <div class="col-md-7">
                             <label class="form-label">@lang('dashboard.book')</label>
-                            <select name="books[0][id]" class="form-select book-select" required>
+                            <select name="books[0][book_id]" class="form-select book-select" required>
                                 <option value="">@lang('dashboard.select_book')</option>
                                 @foreach($books as $book)
                                     <option value="{{ $book->id }}" data-quantity="{{ $book->available_quantity }}">{{ $book->title }} (@lang('dashboard.available'): {{ $book->available_quantity }})</option>
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     addBookBtn.addEventListener('click', function () {
         const newBookRow = bookRowTemplate.cloneNode(true);
-        newBookRow.querySelector('.book-select').name = `books[${bookRowIndex}][id]`;
+        newBookRow.querySelector('.book-select').name = `books[${bookRowIndex}][book_id]`;
         newBookRow.querySelector('.quantity-input').name = `books[${bookRowIndex}][quantity]`;
         booksContainer.appendChild(newBookRow);
         bookRowIndex++;

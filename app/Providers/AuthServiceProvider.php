@@ -10,6 +10,9 @@ use App\Models\Borrow;
 use App\Policies\BorrowPolicy;
 use App\Models\BookRequest;
 use App\Policies\BookRequestPolicy;
+use App\Policies\AuthorPolicy;
+use App\Policies\CategoryPolicy;
+use App\Policies\UserPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -22,6 +25,10 @@ class AuthServiceProvider extends ServiceProvider
         Order::class => OrderPolicy::class,
         Borrow::class => BorrowPolicy::class,
         BookRequest::class => BookRequestPolicy::class,
+        'App\Models\Model' => 'App\Policies\ModelPolicy',
+        'App\Models\Author' => 'App\Policies\AuthorPolicy',
+        'App\Models\Category' => 'App\Policies\CategoryPolicy',
+        'App\Models\User' => 'App\Policies\UserPolicy',
     ];
 
     /**

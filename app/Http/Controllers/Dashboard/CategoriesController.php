@@ -6,12 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Http\Requests\Category\StoreRequest;
 use App\Http\Requests\Category\UpdateRequest;
+use App\Services\Dashboard\CategoryService;
 
 class CategoriesController extends Controller
 {
+    protected $categoryService;
+
+    public function __construct(CategoryService $categoryService)
+    {
+        $this->categoryService = $categoryService;
+    }
+
     public function index()
     {
-        $categories = Category::withCount('books')->latest()->paginate(10);
+        $categories = $this->categoryService->listCategories();
         return view('categories.index', compact('categories'));
     }
 
@@ -22,13 +30,13 @@ class CategoriesController extends Controller
 
     public function store(StoreRequest $request)
     {
-        Category::create($request->validated());
+        $this->categoryService->createCategory($request->validated());
         return redirect()->route('dashboard.categories.index')->with('success', __('dashboard.category_created'));
     }
 
     public function show(Category $category)
     {
-        $category->load('books.author');
+        $category = $this->categoryService->showCategory($category);
         return view('categories.show', compact('category'));
     }
 
@@ -39,16 +47,14 @@ class CategoriesController extends Controller
 
     public function update(UpdateRequest $request, Category $category)
     {
-        $category->update($request->validated());
+        $this->categoryService->updateCategory($category, $request->validated());
         return redirect()->route('dashboard.categories.index')->with('success', __('dashboard.category_updated'));
     }
 
     public function destroy(Category $category)
     {
-        if ($category->books()->count() > 0) {
-            return redirect()->route('dashboard.categories.index')->with('error', __('لا يمكن حذف هذا التصنيف لأنه مرتبط بكتب.'));
-        }
-        $category->delete();
+        $this->authorize('delete', $category);
+        $this->categoryService->deleteCategory($category);
         return redirect()->route('dashboard.categories.index')->with('success', __('dashboard.category_deleted'));
     }
 }

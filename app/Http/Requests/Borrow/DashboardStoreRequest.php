@@ -24,6 +24,8 @@ class DashboardStoreRequest extends FormRequest
         return [
             'user_id' => 'required|exists:users,id',
             'book_id' => 'required|exists:books,id',
+            'borrowed_at' => 'required|date',
+            'due_date' => 'required|date',
         ];
     }
 

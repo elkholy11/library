@@ -5,12 +5,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Author;
 use App\Http\Requests\Author\StoreRequest;
 use App\Http\Requests\Author\UpdateRequest;
+use App\Services\Dashboard\AuthorService;
 
 class AuthorsController extends Controller
 {
+    protected $authorService;
+
+    public function __construct(AuthorService $authorService)
+    {
+        $this->authorService = $authorService;
+    }
+
     public function index()
     {
-        $authors = Author::withCount('books')->latest()->paginate(10);
+        $authors = $this->authorService->listAuthors();
         return view('authors.index', compact('authors'));
     }
 
@@ -21,13 +29,13 @@ class AuthorsController extends Controller
 
     public function store(StoreRequest $request)
     {
-        Author::create($request->validated());
+        $this->authorService->createAuthor($request->validated());
         return redirect()->route('dashboard.authors.index')->with('success', __('dashboard.author_created'));
     }
 
     public function show(Author $author)
     {
-        $author->load('books.category');
+        $author = $this->authorService->showAuthor($author);
         return view('authors.show', compact('author'));
     }
 
@@ -38,17 +46,14 @@ class AuthorsController extends Controller
 
     public function update(UpdateRequest $request, Author $author)
     {
-        $author->update($request->validated());
+        $this->authorService->updateAuthor($author, $request->validated());
         return redirect()->route('dashboard.authors.index')->with('success', __('dashboard.author_updated'));
     }
 
     public function destroy(Author $author)
     {
-        if ($author->books()->count() > 0) {
-            return redirect()->route('authors.index')->with('error', __('لا يمكن حذف هذا المؤلف لأنه مرتبط بكتب.'));
-        }
-        
-        $author->delete();
+        $this->authorize('delete', $author);
+        $this->authorService->deleteAuthor($author);
         return redirect()->route('dashboard.authors.index')->with('success', __('dashboard.author_deleted'));
     }
 } 

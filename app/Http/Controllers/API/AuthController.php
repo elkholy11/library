@@ -10,27 +10,24 @@ use App\Models\User;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\Auth\UserAuthResource;
+use App\Services\AuthService;
 
 class AuthController extends Controller
 {
+    protected $authService;
+
+    public function __construct(AuthService $authService)
+    {
+        $this->authService = $authService;
+    }
+
     /**
      * Register a new user.
      */
     public function register(RegisterRequest $request)
     {
-        $data = $request->validated();
-
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => 'user', // API registration is for 'user' role only
-            'language' => $request->language ?? 'ar',
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return new UserAuthResource($user, $token);
+        $result = $this->authService->register($request);
+        return new UserAuthResource($result['user'], $result['token']);
     }
 
     /**
@@ -38,17 +35,13 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request)
     {
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        $result = $this->authService->login($request);
+        if (!$result) {
             return response()->json([
                 'message' => 'Invalid login details'
             ], 401);
         }
-
-        $user = User::where('email', $request['email'])->firstOrFail();
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return new UserAuthResource($user, $token);
+        return new UserAuthResource($result['user'], $result['token']);
     }
 
     /**
